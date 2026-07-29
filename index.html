@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="description" content="ChronoMap — interactive global historical map overlays. Compare past and present with OpenHistoricalMap." />
   <meta name="theme-color" content="#1a1a2e" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>ChronoMap — Historical Map Overlays</title>
 
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
@@ -15,8 +17,28 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f1a; color: #e8e8f0; }
-    #map { position: absolute; inset: 0; }
+
+    /* Lock the page so map gestures never scroll the document or bounce the address bar */
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: fixed;
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: auto;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f1a;
+      color: #e8e8f0;
+      touch-action: none;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* MapLibre handles its own gestures */
+    }
 
     #controls {
       position: absolute; top: 12px; left: 12px; z-index: 10;
@@ -28,8 +50,10 @@
       width: min(340px, calc(100vw - 24px));
       max-height: calc(100vh - 24px);
       overflow-y: auto;
+      overscroll-behavior: contain; /* scroll inside panel only, don’t leak to page */
       box-shadow: 0 10px 40px rgba(0,0,0,0.5);
       transition: max-height 0.25s ease, padding 0.2s ease;
+      touch-action: auto; /* allow normal interaction inside the panel */
     }
 
     #controls.collapsed {
@@ -136,11 +160,12 @@
     /* ===== Mobile: compact + collapsible ===== */
     @media (max-width: 600px) {
       #controls {
-        top: 8px; left: 8px; right: 8px;
+        top: max(8px, env(safe-area-inset-top));
+        left: 8px; right: 8px;
         width: auto;
         padding: 10px 12px;
         border-radius: 14px;
-        max-height: 42vh; /* leave most of the screen for the map */
+        max-height: 42vh;
       }
       #controls.collapsed {
         max-height: 48px;
@@ -238,10 +263,9 @@
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), 'bottom-left');
 
-    // Collapsible panel (especially useful on mobile)
+    // Collapsible panel
     const controlsEl = document.getElementById('controls');
     const toggleBtn = document.getElementById('toggle-panel');
-    // Start collapsed on small screens so the map is immediately visible
     if (window.matchMedia('(max-width: 600px)').matches) {
       controlsEl.classList.add('collapsed');
       toggleBtn.textContent = '▸';
@@ -251,6 +275,12 @@
       toggleBtn.textContent = collapsed ? '▸' : '▾';
       toggleBtn.title = collapsed ? 'Expand controls' : 'Collapse controls';
     });
+
+    // Extra guard against accidental page scroll while touching the map
+    document.addEventListener('touchmove', (e) => {
+      if (e.target.closest('#controls')) return; // allow scrolling inside the panel
+      e.preventDefault();
+    }, { passive: false });
 
     function showStatus(msg, ms = 2200) {
       const el = document.getElementById('status');
