@@ -18,27 +18,69 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Lock the page so map gestures never scroll the document or bounce the address bar */
     html, body {
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      position: fixed;
+      height: 100%; width: 100%;
+      overflow: hidden; position: fixed;
       overscroll-behavior: none;
       -webkit-overflow-scrolling: auto;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0f0f1a;
-      color: #e8e8f0;
+      background: #0f0f1a; color: #e8e8f0;
       touch-action: none;
     }
 
-    #map {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      touch-action: none; /* MapLibre handles its own gestures */
+    #map-wrap {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      touch-action: none;
     }
+    #map-modern, #map-historical {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+    #map-historical {
+      z-index: 2;
+      clip-path: inset(0 0 0 50%);
+    }
+    #map-modern { z-index: 1; }
+
+    /* Swipe handle */
+    #swipe-handle {
+      display: none;
+      position: absolute; top: 0; bottom: 0;
+      left: 50%; width: 28px; margin-left: -14px;
+      z-index: 5; cursor: ew-resize;
+      touch-action: none;
+    }
+    #swipe-handle.visible { display: block; }
+    #swipe-line {
+      position: absolute; top: 0; bottom: 0; left: 50%;
+      width: 3px; margin-left: -1.5px;
+      background: #38bdf8;
+      box-shadow: 0 0 8px rgba(56,189,248,0.6);
+    }
+    #swipe-knob {
+      position: absolute; top: 50%; left: 50%;
+      width: 36px; height: 36px; margin: -18px 0 0 -18px;
+      border-radius: 50%;
+      background: #0ea5e9;
+      border: 3px solid #fff;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 14px; font-weight: 700;
+      user-select: none;
+    }
+    .swipe-label {
+      position: absolute; top: 12px; z-index: 4;
+      padding: 4px 10px; border-radius: 6px;
+      font-size: 0.7rem; font-weight: 600;
+      background: rgba(15,15,26,0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+      pointer-events: none;
+      display: none;
+    }
+    .swipe-label.visible { display: block; }
+    #label-past { left: 12px; color: #7dd3fc; }
+    #label-present { right: 12px; color: #a7f3d0; }
 
     #controls {
       position: absolute; top: 12px; left: 12px; z-index: 10;
@@ -50,36 +92,23 @@
       width: min(340px, calc(100vw - 24px));
       max-height: calc(100vh - 24px);
       overflow-y: auto;
-      overscroll-behavior: contain; /* scroll inside panel only, don’t leak to page */
+      overscroll-behavior: contain;
       box-shadow: 0 10px 40px rgba(0,0,0,0.5);
       transition: max-height 0.25s ease, padding 0.2s ease;
-      touch-action: auto; /* allow normal interaction inside the panel */
+      touch-action: auto;
     }
 
-    #controls.collapsed {
-      padding: 10px 12px;
-      max-height: 56px;
-      overflow: hidden;
-    }
+    #controls.collapsed { padding: 10px 12px; max-height: 56px; overflow: hidden; }
     #controls.collapsed .panel-body { display: none; }
     #controls.collapsed .subtitle { display: none; }
 
-    .panel-header {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    }
-    .panel-header h1 {
-      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; color: #fff;
-      white-space: nowrap;
-    }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .panel-header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; white-space: nowrap; }
     #toggle-panel {
-      flex-shrink: 0;
-      width: 34px; height: 34px;
-      border-radius: 10px;
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.15);
-      background: rgba(255,255,255,0.08);
-      color: #e8e8f0;
-      font-size: 1.1rem;
-      cursor: pointer;
+      background: rgba(255,255,255,0.08); color: #e8e8f0;
+      font-size: 1.1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
     #toggle-panel:hover { background: rgba(255,255,255,0.16); }
@@ -141,9 +170,7 @@
     }
     #notes:focus { outline: 2px solid #38bdf8; }
 
-    .note {
-      margin-top: 10px; font-size: 0.68rem; line-height: 1.4; color: #8888a0;
-    }
+    .note { margin-top: 10px; font-size: 0.68rem; line-height: 1.4; color: #8888a0; }
     .note a { color: #7dd3fc; text-decoration: none; }
     .note a:hover { text-decoration: underline; }
 
@@ -153,24 +180,17 @@
     #status {
       position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
       background: rgba(15,15,26,0.9); padding: 6px 14px; border-radius: 20px;
-      font-size: 0.75rem; color: #a0e0ff; z-index: 5; display: none;
+      font-size: 0.75rem; color: #a0e0ff; z-index: 6; display: none;
       border: 1px solid rgba(56,189,248,0.3);
     }
 
-    /* ===== Mobile: compact + collapsible ===== */
     @media (max-width: 600px) {
       #controls {
         top: max(8px, env(safe-area-inset-top));
-        left: 8px; right: 8px;
-        width: auto;
-        padding: 10px 12px;
-        border-radius: 14px;
-        max-height: 42vh;
+        left: 8px; right: 8px; width: auto;
+        padding: 10px 12px; border-radius: 14px; max-height: 42vh;
       }
-      #controls.collapsed {
-        max-height: 48px;
-        padding: 8px 10px;
-      }
+      #controls.collapsed { max-height: 48px; padding: 8px 10px; }
       .panel-header h1 { font-size: 1.05rem; }
       #year-display { font-size: 1.25rem; min-width: 56px; }
       .subtitle { font-size: 0.65rem; margin-bottom: 8px; }
@@ -182,11 +202,21 @@
       #notes { min-height: 52px; font-size: 0.75rem; }
       .section-label { margin-top: 8px; }
       .note { font-size: 0.62rem; }
+      #swipe-knob { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
     }
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map-wrap">
+    <div id="map-modern"></div>
+    <div id="map-historical"></div>
+    <div id="swipe-handle">
+      <div id="swipe-line"></div>
+      <div id="swipe-knob">↔</div>
+    </div>
+    <div id="label-past" class="swipe-label">Past</div>
+    <div id="label-present" class="swipe-label">Present</div>
+  </div>
   <div id="status"></div>
 
   <div id="controls">
@@ -226,7 +256,7 @@
       <div class="btn-row">
         <button id="btn-historical" class="active">Historical</button>
         <button id="btn-modern">Modern</button>
-        <button id="btn-compare" title="Scaffold for future swipe/opacity mode">Compare</button>
+        <button id="btn-compare" title="Swipe past vs present">Compare</button>
       </div>
 
       <div class="section-label">Research notes</div>
@@ -247,9 +277,12 @@
     let currentYear = 1900;
     let isHistorical = true;
     let compareMode = false;
+    let swipePct = 50; // percent from left where the divider sits
+    let syncing = false;
 
+    // Primary map = historical (also used alone when not comparing)
     const map = new maplibregl.Map({
-      container: 'map',
+      container: 'map-historical',
       style: OHM_STYLE,
       center: [10, 50],
       zoom: 4,
@@ -260,8 +293,32 @@
       }
     });
 
+    // Secondary map for compare (modern)
+    const mapModern = new maplibregl.Map({
+      container: 'map-modern',
+      style: MODERN_STYLE,
+      center: [10, 50],
+      zoom: 4,
+      interactive: true,
+      attributionControl: false
+    });
+
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), 'bottom-left');
+
+    // Keep both maps in sync
+    function syncMaps(source, target) {
+      if (syncing) return;
+      syncing = true;
+      const c = source.getCenter();
+      const z = source.getZoom();
+      const b = source.getBearing();
+      const p = source.getPitch();
+      target.jumpTo({ center: c, zoom: z, bearing: b, pitch: p });
+      syncing = false;
+    }
+    map.on('move', () => { if (compareMode) syncMaps(map, mapModern); });
+    mapModern.on('move', () => { if (compareMode) syncMaps(mapModern, map); });
 
     // Collapsible panel
     const controlsEl = document.getElementById('controls');
@@ -276,9 +333,8 @@
       toggleBtn.title = collapsed ? 'Expand controls' : 'Collapse controls';
     });
 
-    // Extra guard against accidental page scroll while touching the map
     document.addEventListener('touchmove', (e) => {
-      if (e.target.closest('#controls')) return; // allow scrolling inside the panel
+      if (e.target.closest('#controls') || e.target.closest('#swipe-handle')) return;
       e.preventDefault();
     }, { passive: false });
 
@@ -303,11 +359,9 @@
       if (typeof map.filterByDate === 'function') {
         try { map.filterByDate(String(currentYear)); }
         catch (e) { console.warn('filterByDate', e); }
-      } else {
-        if (!window._filterWarned) {
-          console.info('Date plugin not fully loaded; year UI still works for sharing/notes.');
-          window._filterWarned = true;
-        }
+      } else if (!window._filterWarned) {
+        console.info('Date plugin not fully loaded; year UI still works for sharing/notes.');
+        window._filterWarned = true;
       }
 
       updateHashDate(currentYear);
@@ -331,10 +385,73 @@
     });
 
     map.on('styledata', () => {
-      if (isHistorical && typeof map.filterByDate === 'function') {
+      if ((isHistorical || compareMode) && typeof map.filterByDate === 'function') {
         try { map.filterByDate(String(currentYear)); } catch (e) {}
       }
     });
+
+    // --- Swipe compare ---
+    const histEl = document.getElementById('map-historical');
+    const handle = document.getElementById('swipe-handle');
+    const labelPast = document.getElementById('label-past');
+    const labelPresent = document.getElementById('label-present');
+
+    function setSwipe(pct) {
+      swipePct = Math.max(5, Math.min(95, pct));
+      histEl.style.clipPath = `inset(0 0 0 ${swipePct}%)`;
+      handle.style.left = swipePct + '%';
+    }
+
+    function enableCompare() {
+      compareMode = true;
+      document.getElementById('btn-compare').classList.add('active');
+      document.getElementById('btn-historical').classList.remove('active');
+      document.getElementById('btn-modern').classList.remove('active');
+      // Ensure historical style is showing on the left map
+      if (!isHistorical) {
+        isHistorical = true;
+        map.setStyle(OHM_STYLE);
+      }
+      syncMaps(map, mapModern);
+      setSwipe(50);
+      handle.classList.add('visible');
+      labelPast.classList.add('visible');
+      labelPresent.classList.add('visible');
+      mapModern.resize();
+      map.resize();
+      showStatus('Drag the blue line to compare past ↔ present');
+    }
+
+    function disableCompare() {
+      compareMode = false;
+      document.getElementById('btn-compare').classList.remove('active');
+      handle.classList.remove('visible');
+      labelPast.classList.remove('visible');
+      labelPresent.classList.remove('visible');
+      histEl.style.clipPath = 'none';
+    }
+
+    // Drag handle
+    let dragging = false;
+    function onPointerDown(e) {
+      dragging = true;
+      handle.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+    }
+    function onPointerMove(e) {
+      if (!dragging) return;
+      const rect = document.getElementById('map-wrap').getBoundingClientRect();
+      const x = (e.clientX ?? e.touches?.[0]?.clientX) - rect.left;
+      setSwipe((x / rect.width) * 100);
+    }
+    function onPointerUp() { dragging = false; }
+
+    handle.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    handle.addEventListener('touchstart', onPointerDown, { passive: false });
+    window.addEventListener('touchmove', (e) => { if (dragging) onPointerMove(e); }, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
 
     document.getElementById('year-slider').addEventListener('input', e => {
       applyDateFilter(parseInt(e.target.value, 10));
@@ -348,7 +465,7 @@
     });
 
     document.getElementById('btn-historical').addEventListener('click', () => {
-      if (isHistorical) return;
+      disableCompare();
       isHistorical = true;
       document.getElementById('btn-historical').classList.add('active');
       document.getElementById('btn-modern').classList.remove('active');
@@ -357,7 +474,7 @@
     });
 
     document.getElementById('btn-modern').addEventListener('click', () => {
-      if (!isHistorical) return;
+      disableCompare();
       isHistorical = false;
       document.getElementById('btn-modern').classList.add('active');
       document.getElementById('btn-historical').classList.remove('active');
@@ -366,11 +483,17 @@
     });
 
     document.getElementById('btn-compare').addEventListener('click', () => {
-      compareMode = !compareMode;
-      document.getElementById('btn-compare').classList.toggle('active', compareMode);
-      showStatus(compareMode
-        ? 'Compare mode (scaffolding) — full swipe/opacity coming next'
-        : 'Compare mode off');
+      if (compareMode) {
+        disableCompare();
+        // return to historical view
+        isHistorical = true;
+        document.getElementById('btn-historical').classList.add('active');
+        document.getElementById('btn-modern').classList.remove('active');
+        map.setStyle(OHM_STYLE);
+        showStatus('Compare off');
+      } else {
+        enableCompare();
+      }
     });
 
     document.getElementById('geo-btn').addEventListener('click', () => {
@@ -381,7 +504,9 @@
       showStatus('Locating…');
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 12 });
+          const center = [pos.coords.longitude, pos.coords.latitude];
+          map.flyTo({ center, zoom: 12 });
+          if (compareMode) mapModern.flyTo({ center, zoom: 12 });
           showStatus('Centered on your location');
         },
         () => showStatus('Location permission denied or unavailable')
@@ -398,7 +523,9 @@
         const data = await res.json();
         if (data && data[0]) {
           const { lon, lat, display_name } = data[0];
-          map.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: 11 });
+          const center = [parseFloat(lon), parseFloat(lat)];
+          map.flyTo({ center, zoom: 11 });
+          if (compareMode) mapModern.flyTo({ center, zoom: 11 });
           showStatus(display_name.split(',').slice(0, 2).join(', '));
         } else {
           showStatus('No results');
@@ -418,14 +545,16 @@
       return `cm-notes-${currentYear}-${c.lng.toFixed(2)}-${c.lat.toFixed(2)}`;
     }
     function loadNotes() {
-      const ta = document.getElementById('notes');
-      ta.value = localStorage.getItem(notesKey()) || '';
+      document.getElementById('notes').value = localStorage.getItem(notesKey()) || '';
     }
     function saveNotes() {
       localStorage.setItem(notesKey(), document.getElementById('notes').value);
     }
     document.getElementById('notes').addEventListener('input', saveNotes);
-    map.on('moveend', () => { if (document.getElementById('notes') === document.activeElement) return; loadNotes(); });
+    map.on('moveend', () => {
+      if (document.getElementById('notes') === document.activeElement) return;
+      loadNotes();
+    });
 
     document.addEventListener('keydown', (e) => {
       if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -434,6 +563,12 @@
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
         applyDateFilter(currentYear + (e.shiftKey ? 10 : 1));
       }
+    });
+
+    // Resize maps when window changes
+    window.addEventListener('resize', () => {
+      map.resize();
+      mapModern.resize();
     });
   </script>
 </body>
