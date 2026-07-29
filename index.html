@@ -10,7 +10,6 @@
 
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <!-- Date filter plugin (may load as UMD; we also have a soft fallback) -->
   <script src="https://cdn.jsdelivr.net/npm/@openhistoricalmap/maplibre-gl-dates@1.3.0/dist/maplibre-gl-dates.js"></script>
   <script src="https://unpkg.com/@openhistoricalmap/maplibre-gl-dates@1.3.0"></script>
 
@@ -30,9 +29,37 @@
       max-height: calc(100vh - 24px);
       overflow-y: auto;
       box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      transition: max-height 0.25s ease, padding 0.2s ease;
     }
 
-    #controls h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+    #controls.collapsed {
+      padding: 10px 12px;
+      max-height: 56px;
+      overflow: hidden;
+    }
+    #controls.collapsed .panel-body { display: none; }
+    #controls.collapsed .subtitle { display: none; }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .panel-header h1 {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; color: #fff;
+      white-space: nowrap;
+    }
+    #toggle-panel {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: #e8e8f0;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #toggle-panel:hover { background: rgba(255,255,255,0.16); }
+
     .subtitle { font-size: 0.72rem; color: #a0a0b8; margin: 2px 0 12px; }
 
     .search-row { display: flex; gap: 6px; margin-bottom: 12px; }
@@ -106,9 +133,30 @@
       border: 1px solid rgba(56,189,248,0.3);
     }
 
-    @media (max-width: 480px) {
-      #controls { top: 8px; left: 8px; padding: 12px; width: calc(100vw - 16px); }
-      #year-display { font-size: 1.3rem; }
+    /* ===== Mobile: compact + collapsible ===== */
+    @media (max-width: 600px) {
+      #controls {
+        top: 8px; left: 8px; right: 8px;
+        width: auto;
+        padding: 10px 12px;
+        border-radius: 14px;
+        max-height: 42vh; /* leave most of the screen for the map */
+      }
+      #controls.collapsed {
+        max-height: 48px;
+        padding: 8px 10px;
+      }
+      .panel-header h1 { font-size: 1.05rem; }
+      #year-display { font-size: 1.25rem; min-width: 56px; }
+      .subtitle { font-size: 0.65rem; margin-bottom: 8px; }
+      .search-row { margin-bottom: 8px; }
+      #search-input { padding: 7px 9px; font-size: 0.8rem; }
+      #search-btn, #geo-btn { padding: 7px 9px; }
+      .presets button { padding: 4px 7px; font-size: 0.68rem; }
+      .btn-row button { padding: 7px 6px; font-size: 0.72rem; }
+      #notes { min-height: 52px; font-size: 0.75rem; }
+      .section-label { margin-top: 8px; }
+      .note { font-size: 0.62rem; }
     }
   </style>
 </head>
@@ -117,48 +165,53 @@
   <div id="status"></div>
 
   <div id="controls">
-    <h1>ChronoMap</h1>
+    <div class="panel-header">
+      <h1>ChronoMap</h1>
+      <button id="toggle-panel" title="Collapse / expand controls" aria-label="Toggle panel">▾</button>
+    </div>
     <div class="subtitle">Past ↔ Present · Global historical overlays</div>
 
-    <div class="search-row">
-      <input type="text" id="search-input" placeholder="Search place…" autocomplete="off" />
-      <button id="search-btn" title="Search">🔍</button>
-      <button id="geo-btn" title="My location">📍</button>
-    </div>
+    <div class="panel-body">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Search place…" autocomplete="off" />
+        <button id="search-btn" title="Search">🔍</button>
+        <button id="geo-btn" title="My location">📍</button>
+      </div>
 
-    <div class="year-row">
-      <span id="year-display">1900</span>
-      <input type="range" id="year-slider" min="1000" max="2024" value="1900" step="1" />
-    </div>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
-      <label for="year-input" style="font-size:0.72rem; color:#a0a0b8;">Year</label>
-      <input type="number" id="year-input" min="1" max="2025" value="1900" />
-    </div>
+      <div class="year-row">
+        <span id="year-display">1900</span>
+        <input type="range" id="year-slider" min="1000" max="2024" value="1900" step="1" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
+        <label for="year-input" style="font-size:0.72rem; color:#a0a0b8;">Year</label>
+        <input type="number" id="year-input" min="1" max="2025" value="1900" />
+      </div>
 
-    <div class="presets" id="presets">
-      <button data-year="1500">1500</button>
-      <button data-year="1700">1700</button>
-      <button data-year="1800">1800</button>
-      <button data-year="1850">1850</button>
-      <button data-year="1900" class="active-preset">1900</button>
-      <button data-year="1950">1950</button>
-      <button data-year="2000">2000</button>
-      <button data-year="2020">2020</button>
-    </div>
+      <div class="presets" id="presets">
+        <button data-year="1500">1500</button>
+        <button data-year="1700">1700</button>
+        <button data-year="1800">1800</button>
+        <button data-year="1850">1850</button>
+        <button data-year="1900" class="active-preset">1900</button>
+        <button data-year="1950">1950</button>
+        <button data-year="2000">2000</button>
+        <button data-year="2020">2020</button>
+      </div>
 
-    <div class="btn-row">
-      <button id="btn-historical" class="active">Historical</button>
-      <button id="btn-modern">Modern</button>
-      <button id="btn-compare" title="Scaffold for future swipe/opacity mode">Compare</button>
-    </div>
+      <div class="btn-row">
+        <button id="btn-historical" class="active">Historical</button>
+        <button id="btn-modern">Modern</button>
+        <button id="btn-compare" title="Scaffold for future swipe/opacity mode">Compare</button>
+      </div>
 
-    <div class="section-label">Research notes</div>
-    <textarea id="notes" placeholder="Notes for this place & year… (saved locally)"></textarea>
+      <div class="section-label">Research notes</div>
+      <textarea id="notes" placeholder="Notes for this place & year… (saved locally)"></textarea>
 
-    <div class="note">
-      Data © <a href="https://www.openhistoricalmap.org/" target="_blank" rel="noopener">OpenHistoricalMap</a> contributors.
-      Year filter reduces anachronisms. Coverage varies by region & era.
-      URL keeps place + year. Notes stay in this browser.
+      <div class="note">
+        Data © <a href="https://www.openhistoricalmap.org/" target="_blank" rel="noopener">OpenHistoricalMap</a> contributors.
+        Year filter reduces anachronisms. Coverage varies by region & era.
+        URL keeps place + year. Notes stay in this browser.
+      </div>
     </div>
   </div>
 
@@ -185,6 +238,20 @@
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), 'bottom-left');
 
+    // Collapsible panel (especially useful on mobile)
+    const controlsEl = document.getElementById('controls');
+    const toggleBtn = document.getElementById('toggle-panel');
+    // Start collapsed on small screens so the map is immediately visible
+    if (window.matchMedia('(max-width: 600px)').matches) {
+      controlsEl.classList.add('collapsed');
+      toggleBtn.textContent = '▸';
+    }
+    toggleBtn.addEventListener('click', () => {
+      const collapsed = controlsEl.classList.toggle('collapsed');
+      toggleBtn.textContent = collapsed ? '▸' : '▾';
+      toggleBtn.title = collapsed ? 'Expand controls' : 'Collapse controls';
+    });
+
     function showStatus(msg, ms = 2200) {
       const el = document.getElementById('status');
       el.textContent = msg;
@@ -199,7 +266,6 @@
       document.getElementById('year-slider').value = currentYear;
       document.getElementById('year-input').value = currentYear;
 
-      // Highlight matching preset
       document.querySelectorAll('.presets button').forEach(b => {
         b.classList.toggle('active-preset', parseInt(b.dataset.year, 10) === currentYear);
       });
@@ -208,7 +274,6 @@
         try { map.filterByDate(String(currentYear)); }
         catch (e) { console.warn('filterByDate', e); }
       } else {
-        // Soft fallback message once
         if (!window._filterWarned) {
           console.info('Date plugin not fully loaded; year UI still works for sharing/notes.');
           window._filterWarned = true;
@@ -226,13 +291,10 @@
       } else {
         hash = hash ? (hash + (hash.includes('?') || hash.includes('=') ? '&' : '') + 'date=' + year) : ('#date=' + year);
       }
-      // Cleaner: prefer &date= after map=
       if (location.hash !== hash) history.replaceState(null, '', hash);
     }
 
     map.once('styledata', () => {
-      const params = new URLSearchParams(location.hash.replace(/^#/, '').replace(/&/g, '&'));
-      // also parse from full hash string
       const m = location.hash.match(/date=(\d+)/);
       if (m) currentYear = parseInt(m[1], 10);
       applyDateFilter(currentYear);
@@ -244,7 +306,6 @@
       }
     });
 
-    // UI
     document.getElementById('year-slider').addEventListener('input', e => {
       applyDateFilter(parseInt(e.target.value, 10));
     });
@@ -274,17 +335,14 @@
       showStatus('Modern basemap');
     });
 
-    // Compare scaffolding
     document.getElementById('btn-compare').addEventListener('click', () => {
       compareMode = !compareMode;
       document.getElementById('btn-compare').classList.toggle('active', compareMode);
       showStatus(compareMode
         ? 'Compare mode (scaffolding) — full swipe/opacity coming next'
         : 'Compare mode off');
-      // Future: split view or opacity slider between two styles
     });
 
-    // Geolocation
     document.getElementById('geo-btn').addEventListener('click', () => {
       if (!navigator.geolocation) {
         showStatus('Geolocation not supported');
@@ -300,7 +358,6 @@
       );
     });
 
-    // Search (Nominatim)
     async function doSearch() {
       const q = document.getElementById('search-input').value.trim();
       if (!q) return;
@@ -326,7 +383,6 @@
       if (e.key === 'Enter') doSearch();
     });
 
-    // Notes (localStorage keyed by rough place + year)
     function notesKey() {
       const c = map.getCenter();
       return `cm-notes-${currentYear}-${c.lng.toFixed(2)}-${c.lat.toFixed(2)}`;
@@ -341,7 +397,6 @@
     document.getElementById('notes').addEventListener('input', saveNotes);
     map.on('moveend', () => { if (document.getElementById('notes') === document.activeElement) return; loadNotes(); });
 
-    // Keyboard year change
     document.addEventListener('keydown', (e) => {
       if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
       if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
